@@ -1,13 +1,13 @@
 require 'rubygems'
 require 'rest-client'
 require 'json'
-nick = "kk4"
+nick = "kk5"
 require './player'
 
 
 p = Player.new(nick)
 
-100.times do
+500.times do
   begin
     puts p.play_game(5)
   rescue Exception => e

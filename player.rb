@@ -1,6 +1,6 @@
 class Player
   
-  attr_accessor :tid, :resource, :nick, :table, :status, :dealer_card, :hand, :bet
+  attr_accessor :tid, :resource, :nick, :table, :status, :dealer_card, :hand, :bet, :num_cards, :deck_cards_num, :score
   CARD_MAP = {
     "ace" => 1,
     "two" => 2,
@@ -25,15 +25,50 @@ class Player
     @table = @resource["/tables?nick=#{@nick}"].post ''
     @tid = JSON.parse(@table)["tableId"]
     @done = false
+    @deck_cards_num = 0
+    @score = 0
+  end
+
+  def score(card)
+    case card
+    when 2, 3, 7
+      1
+    when 4, 5, 6
+      2
+    when 8, 9
+      0
+    when 10
+      -2
+    when 1
+      -1
+    else
+      raise "Unknown"
+    end
   end
   
   def play_game(bet = 5)
     @done = false
-    @bet = bet
-    cards = @resource["/tables/#{@tid}/startGame?bet=#{bet}"].put ''
+    @bet =  @score <= 0 ? 1  :   bet * (Math::E ** (@score/4))
+    @bet = @bet.to_i
+    puts "Bet : #{@bet}"
+    cards = @resource["/tables/#{@tid}/startGame?bet=#{@bet}"].put ''
     parse_resp(cards)
     strategy until(@done)
+    @deck_cards_num = (@num_cards + @deck_cards_num)
+    if @deck_cards_num > 52
+      @deck_cards_num %= 52
+      @score = 0
+    end
+    update_score
+    puts " Score : #{@score}"
+    puts " Deck cards : #{@deck_cards_num}"
     @net
+  end
+
+  #card counting score
+  def update_score
+    @dealer_card.each {|c| @score += score(c)}
+    @hand.each {|c| @score += score(c)}
   end
   
   def parse_card(card)
@@ -53,9 +88,10 @@ class Player
       dealer_c = cards["dealerUpCard"]
       @dealer_card = parse_card(dealer_c)
     end
-    
     player_hand = cards["playerHand"]
     @hand = parse_cards(player_hand)
+    @num_cards = @dealer_card.size + @hand.size
+
     if(outcome = cards["outcome"])
       @done = true
       @dealer_final = outcome["dealerValue"]
@@ -63,7 +99,7 @@ class Player
       @net = outcome["netChange"]
     end
   end
-
+  
   def strategy
     st = []
     (1..10).each do |i|
